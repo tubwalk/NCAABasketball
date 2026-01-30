@@ -1,0 +1,75 @@
+import pandas as pd
+from pathlib import Path
+
+# ---------------- TEST FINAL SCORES ----------------
+FINAL_SCORES = {
+    "Duke vs UNC": {"home": 78, "away": 70},
+    "Kansas vs Baylor": {"home": 82, "away": 80},
+    "UConn vs Villanova": {"home": 65, "away": 72},
+}
+
+# ---------------- CONFIG ----------------
+archive_files = list(Path("data/history").glob("*_picks.csv"))
+
+if not archive_files:
+    print("No archived pick files found.")
+    exit()
+
+latest_file = sorted(archive_files)[-1]
+print(f"Grading file: {latest_file.name}")
+
+picks = pd.read_csv(latest_file)
+
+# ---------------- FAKE FINAL SCORES (SAFE PLACEHOLDER) ----------------
+fake_scores = {
+    "Duke vs UNC": {"home": 78, "away": 70},
+    "Kansas vs Baylor": {"home": 82, "away": 80},
+}
+
+# ---------------- GRADING LOGIC ----------------
+def grade_pick(row):
+    game = row["game"]
+    bet_type = row["bet_type"]
+    pick = row["pick"]
+    odds = row["odds"]
+    stake = row["stake"]
+
+    if game not in fake_scores:
+        return "SKIP", 0
+
+    home = fake_scores[game]["home"]
+    away = fake_scores[game]["away"]
+    total = home + away
+
+    if bet_type == "moneyline":
+        if pick == "HOME" and home > away:
+            return "WIN", stake * (abs(odds) / 100)
+        if pick == "AWAY" and away > home:
+            return "WIN", stake * (abs(odds) / 100)
+        return "LOSS", -stake
+
+    if bet_type == "total":
+        line = float(row["line"])
+        if pick == "OVER" and total > line:
+            return "WIN", stake * (abs(odds) / 100)
+        if pick == "UNDER" and total < line:
+            return "WIN", stake * (abs(odds) / 100)
+        if total == line:
+            return "PUSH", 0
+        return "LOSS", -stake
+
+    if bet_type == "spread":
+        line = float(row["line"])
+        if pick == "HOME" and (home - away) > line:
+            return "WIN", stake * (abs(odds) / 100)
+        if pick == "AWAY" and (away - home) > line:
+            return "WIN", stake * (abs(odds) / 100)
+        if abs(home - away) == abs(line):
+            return "PUSH", 0
+        return "LOSS", -stake
+
+    return "UNKNOWN", 0
+
+
+# ---------------- DRY R
+
