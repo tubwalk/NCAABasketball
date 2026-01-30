@@ -103,13 +103,13 @@ if not PUBLIC_MODE:
 st.set_page_config(page_title="NCAADataEdge — Results", layout="wide")
 
 # ================================
-# PUBLIC VIEW (HISTORY ONLY)
+# PUBLIC VIEW (HISTORY ONLY — NO $)
 # ================================
 if PUBLIC_MODE:
     st.markdown("## 📊 NCAADataEdge — Public Results")
     st.caption(
         "All picks are logged pre-game and graded transparently. "
-        "No guarantees. For informational purposes only."
+        "Dollar amounts and risk are intentionally hidden."
     )
 
     results = read_csv_safe(RESULTS_PATH)
@@ -119,34 +119,33 @@ if PUBLIC_MODE:
         st.info("No results yet.")
         st.stop()
 
-    results["stake"] = results.apply(
-        lambda r: stake_from_to_win(r["bet_size"], r["odds"]), axis=1
-    )
-
     results["date"] = pd.to_datetime(results["date"], errors="coerce")
     results["month"] = results["date"].dt.to_period("M").astype(str)
 
+    # ---- MONTHLY SUMMARY (NO PROFIT / NO RISK) ----
     monthly = (
         results
         .groupby("month")
         .agg(
-            bets=("result", "count"),
-            profit=("profit", "sum"),
-            risk=("stake", "sum"),
-            wins=("result", lambda x: (x == "WIN").sum())
+            Bets=("result", "count"),
+            Wins=("result", lambda x: (x == "WIN").sum())
         )
         .reset_index()
     )
 
-    monthly["ROI %"] = (monthly["profit"] / monthly["risk"] * 100).round(2)
-    monthly["Win Rate %"] = (monthly["wins"] / monthly["bets"] * 100).round(1)
+    monthly["Win Rate %"] = (monthly["Wins"] / monthly["Bets"] * 100).round(1)
 
     st.subheader("📅 Monthly Summary")
     st.dataframe(monthly, use_container_width=True, hide_index=True)
 
+    # ---- PUBLIC HISTORY TABLE (NO $) ----
+    public_results = results[
+        ["date", "game", "market", "selection", "result", "confidence"]
+    ]
+
     st.subheader("📋 Full Bet History")
     st.dataframe(
-        results.sort_values("date", ascending=False),
+        public_results.sort_values("date", ascending=False),
         use_container_width=True,
         hide_index=True
     )
@@ -301,7 +300,7 @@ with tab_picks:
         rerun()
 
 # ------------------------------------------------------
-# PERFORMANCE
+# PERFORMANCE (PRIVATE)
 # ------------------------------------------------------
 with tab_perf:
     st.markdown("## 📈 Performance — All Time")
@@ -330,4 +329,8 @@ with tab_perf:
 with tab_history:
     st.markdown("## 📜 Full History")
     results = read_csv_safe(RESULTS_PATH)
-    st.dataframe(results.sort_values("date", ascending=False), use_container_width=True, hide_index=True)
+    st.dataframe(
+        results.sort_values("date", ascending=False),
+        use_container_width=True,
+        hide_index=True
+    )
